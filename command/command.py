@@ -5,7 +5,7 @@
 # @desc : 本代码未经授权禁止商用
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from subprocess import Popen, PIPE, run
+from subprocess import Popen, PIPE
 from pydantic import BaseModel
 import shlex
 
@@ -38,7 +38,7 @@ class CommandBase:
         self.timeout = timeout
         self.popens_status: list[Status] = [Status() for _ in popens]
 
-    def get_status(self) -> list[Status]:
+    def run(self) -> list[Status]:
         for p, s in zip(self.popens, self.popens_status):
             if not s.finished:
                 s.finished = True
@@ -66,10 +66,10 @@ class SingleCommand(CommandBase):
         ], timeout)
 
     def get_code(self) -> int:
-        return self.get_status()[0].returncode
+        return self.run()[0].returncode
 
     def get_output(self) -> str:
-        return self.get_status()[0].stdout
+        return self.run()[0].stdout
 
 
 class MultiCommand(CommandBase):
@@ -111,8 +111,8 @@ class ShellCommand(CommandBase):
         super().__init__([Popen("\n".join(cmds), shell=True, **kwargs)], timeout)
 
     def get_code(self) -> int:
-        return self.get_status()[0].returncode
+        return self.run()[0].returncode
 
     def get_output(self) -> str:
-        return self.get_status()[0].stdout
+        return self.run()[0].stdout
 
