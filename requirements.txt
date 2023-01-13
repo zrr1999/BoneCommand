@@ -2,3 +2,6 @@ pydantic
 typer
 pyperclip
 pypdf
+psutil
+rich
+flet

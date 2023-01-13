@@ -7,6 +7,7 @@ from __future__ import annotations
 from utils import merge_pdfs, split_pdf
 from pathlib import Path
 import typer
+
 app = typer.Typer()
 
 
@@ -20,5 +21,5 @@ def split(file_name, start_page, end_page, output_pdf):
     split_pdf(file_name, start_page, end_page, output_pdf)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app()

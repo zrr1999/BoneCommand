@@ -4,18 +4,18 @@
 # @Author : Rongrui Zhan
 # @desc : 本代码未经授权禁止商用
 from setuptools import setup, find_packages
-from command import __version__
+from bonecommand import __version__
 
-with open("README.md", "r", encoding='UTF-8') as fh:
+with open("README.md", "r", encoding="UTF-8") as fh:
     long_description = fh.read()
 
-with open("requirements.txt", "r", encoding='UTF-8') as fh:
+with open("requirements.txt", "r", encoding="UTF-8") as fh:
     requirements = fh.readlines()
 
 setup(
     name="powercommand",
     version=__version__,
-    keywords=["command", "shell"],
+    keywords=["bonecommand", "shell"],
     description="一个用于提升效率的命令行工具",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -37,5 +37,6 @@ setup(
     include_package_data=True,
     platforms="any",
     install_requires=requirements,
-    scripts=[]
+    scripts=[],
+    entry_points={"console_scripts": ["test_test=bonecommand:app"]},
 )

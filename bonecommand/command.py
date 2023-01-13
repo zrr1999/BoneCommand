@@ -17,12 +17,12 @@ if TYPE_CHECKING:
 
 
 def gen_default_kwargs(kwargs: dict[str, Any]):
-    if kwargs.get('stdin') is None:
-        kwargs['stdin'] = PIPE
-    if kwargs.get('stderr') is None:
-        kwargs['stderr'] = PIPE
-    if kwargs.get('stdout') is None:
-        kwargs['stdout'] = PIPE
+    if kwargs.get("stdin") is None:
+        kwargs["stdin"] = PIPE
+    if kwargs.get("stderr") is None:
+        kwargs["stderr"] = PIPE
+    if kwargs.get("stdout") is None:
+        kwargs["stdout"] = PIPE
     return kwargs
 
 
@@ -49,21 +49,24 @@ class CommandBase:
 
 
 class SingleCommand(CommandBase):
-    def __init__(self, cmd: CMD, working_path: StrOrBytesPath | None = None,
-                 timeout: float | None = None, **kwargs):
+    def __init__(
+        self,
+        cmd: CMD,
+        working_path: StrOrBytesPath | None = None,
+        timeout: float | None = None,
+        **kwargs,
+    ):
         if isinstance(cmd, str):
             self.cmd = shlex.split(cmd)
         else:
             self.cmd = cmd
         if working_path is not None:
-            if kwargs.get('cwd') is not None:
-                raise ValueError('cwd and working_path arguments may not both be used.')
-            kwargs['cwd'] = working_path
+            if kwargs.get("cwd") is not None:
+                raise ValueError("cwd and working_path arguments may not both be used.")
+            kwargs["cwd"] = working_path
         kwargs = gen_default_kwargs(kwargs)
         self.kwargs = kwargs
-        super().__init__([
-            Popen(self.cmd, **self.kwargs)
-        ], timeout)
+        super().__init__([Popen(self.cmd, **self.kwargs)], timeout)
 
     def get_code(self) -> int:
         return self.run()[0].returncode
@@ -73,12 +76,17 @@ class SingleCommand(CommandBase):
 
 
 class MultiCommand(CommandBase):
-    def __init__(self, cmds: Sequence[CMD], working_path: StrOrBytesPath | None = None,
-                 timeout: float | None = None, **kwargs):
+    def __init__(
+        self,
+        cmds: Sequence[CMD],
+        working_path: StrOrBytesPath | None = None,
+        timeout: float | None = None,
+        **kwargs,
+    ):
         if working_path is not None:
-            if kwargs.get('cwd') is not None:
-                raise ValueError('cwd and working_path arguments may not both be used.')
-            kwargs['cwd'] = working_path
+            if kwargs.get("cwd") is not None:
+                raise ValueError("cwd and working_path arguments may not both be used.")
+            kwargs["cwd"] = working_path
         kwargs = gen_default_kwargs(kwargs)
         popens = []
         for cmd in cmds:
@@ -101,12 +109,17 @@ class MultiCommand(CommandBase):
 
 
 class ShellCommand(CommandBase):
-    def __init__(self, cmds: Sequence[str], working_path: StrOrBytesPath | None = None,
-                 timeout: float | None = None, **kwargs):
+    def __init__(
+        self,
+        cmds: Sequence[str],
+        working_path: StrOrBytesPath | None = None,
+        timeout: float | None = None,
+        **kwargs,
+    ):
         if working_path is not None:
-            if kwargs.get('cwd') is not None:
-                raise ValueError('cwd and working_path arguments may not both be used.')
-            kwargs['cwd'] = working_path
+            if kwargs.get("cwd") is not None:
+                raise ValueError("cwd and working_path arguments may not both be used.")
+            kwargs["cwd"] = working_path
         kwargs = gen_default_kwargs(kwargs)
         super().__init__([Popen("\n".join(cmds), shell=True, **kwargs)], timeout)
 
@@ -115,4 +128,3 @@ class ShellCommand(CommandBase):
 
     def get_output(self) -> str:
         return self.run()[0].stdout
-

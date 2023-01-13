@@ -6,3 +6,8 @@
 from .command import CommandBase, MultiCommand, SingleCommand, ShellCommand
 
 __version__ = "0.0.1"
+all_commands = [
+    "git",
+    "pdf",
+    "ssh",
+]

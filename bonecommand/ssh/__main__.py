@@ -6,20 +6,19 @@
 import typer
 import pyperclip
 import os
-from command import SingleCommand, MultiCommand
+from bonecommand import SingleCommand, MultiCommand
+from bonecommand.utils import user_path
 
 app = typer.Typer()
 
 
 @app.command()
 def show_pub(copy: bool = False):
-    user_path = os.path.expanduser('~')
     if not os.path.exists(f"{user_path}/.ssh/id_rsa.pub"):
         email = SingleCommand("git config user.email").get_output()
-        cmd = MultiCommand([
-            f"ssh-keygen -t rsa -C '{email}'",
-            f"cat {user_path}/.ssh/id_rsa.pub"
-        ])
+        cmd = MultiCommand(
+            [f"ssh-keygen -t rsa -C '{email}'", f"cat {user_path}/.ssh/id_rsa.pub"]
+        )
     else:
         cmd = SingleCommand(f"cat {user_path}/.ssh/id_rsa.pub")
     out = cmd.get_output()
@@ -28,5 +27,5 @@ def show_pub(copy: bool = False):
         pyperclip.copy(out)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app()
