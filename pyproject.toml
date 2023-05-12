@@ -1,0 +1,19 @@
+[project]
+name = "BoneCommand"
+description = "一个用于提升效率的命令行工具"
+dependencies = ["pydantic", "typer", "pyperclip", "pypdf", "psutil", "rich"]
+readme = "README.md"
+authors = [
+    {name = "Rongrui Zhan", email = "2742392377@qq.com"},
+]
+dynamic = ["version"]
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+[tool.pdm.version]
+source = "file"
+path = "bonecommand/__init__.py"
+
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"

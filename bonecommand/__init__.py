@@ -5,7 +5,7 @@
 # @desc : 本代码未经授权禁止商用
 from .command import CommandBase, MultiCommand, SingleCommand, ShellCommand
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 all_commands = [
     "git",
     "pdf",

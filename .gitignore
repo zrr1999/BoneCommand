@@ -1,0 +1,6 @@
+.idea/
+dist/
+**/__pycache__/
+
+.pdm.toml
+.DS_Store

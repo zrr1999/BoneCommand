@@ -27,5 +27,20 @@ def show_pub(copy: bool = False):
         pyperclip.copy(out)
 
 
+@app.command()
+def create_root_sshd(copy: bool = False):
+    if not os.path.exists(f"{user_path}/.ssh/id_rsa.pub"):
+        email = SingleCommand("git config user.email").get_output()
+        cmd = MultiCommand(
+            [f"ssh-keygen -t rsa -C '{email}'", f"cat {user_path}/.ssh/id_rsa.pub"]
+        )
+    else:
+        cmd = SingleCommand(f"cat {user_path}/.ssh/id_rsa.pub")
+    out = cmd.get_output()
+    print(out)
+    if copy:
+        pyperclip.copy(out)
+
+
 if __name__ == "__main__":
     app()
