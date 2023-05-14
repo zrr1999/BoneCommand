@@ -11,7 +11,7 @@ import shlex
 
 if TYPE_CHECKING:
     from _typeshed import StrOrBytesPath
-    from typing import Sequence, Union, Any, Optional
+    from typing import Sequence, Union, Any, Optional, Iterable
 
     CMD = Union[StrOrBytesPath, Sequence[StrOrBytesPath]]
 
@@ -26,6 +26,16 @@ def gen_default_kwargs(kwargs: dict[str, Any]):
     return kwargs
 
 
+def wait_popen(popen: Popen, status: Status, timeout: float | None = None):
+    with popen:
+        status.returncode = popen.wait(timeout=timeout)
+        status.finished = True
+        if popen.stdout is not None:
+            status.stdout = popen.stdout.read()
+        if isinstance(status.stdout, bytes):
+            status.stdout = status.stdout.decode()
+
+
 class SubprocessError(Exception):
     def __init__(self, return_code):
         self.return_code = return_code
@@ -33,33 +43,28 @@ class SubprocessError(Exception):
 
 
 class Status(BaseModel):
+    popen: Popen
     finished: bool = False
     returncode: Optional[int] = None
     stdout: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class CommandBase:
     def __init__(self, timeout: float | None = None):
         self.timeout = timeout
-        self.popens: list[Popen] = []
-        self.status: list[Status] = []
+        self.statuses: list[Status] = []
 
-    def create_popens(self):
-        raise NotImplementedError
+    def run(self) -> list[Status] | Status:
+        raise NotImplementedError()
 
-    def run(self) -> list[Status]:
-        self.create_popens()
-        for p, s in zip(self.popens, self.status):
-            if not s.finished:
-                s.finished = True
-                with p:
-                    s.returncode = p.wait(timeout=self.timeout)
-                    if p.stdout is not None:
-                        s.stdout = p.stdout.read().decode()
-        return self.status
+    async def async_run(self) -> list[Status] | Status:
+        return self.run()
 
     def finished(self) -> bool:
-        for s in self.status:
+        for s in self.statuses:
             if not s.finished:
                 return False
         return True
@@ -71,17 +76,17 @@ class CommandBase:
         return 0
 
     def get_output(self) -> str | None:
-        raise NotImplementedError
+        return str(self.get_outputs())
 
     def get_codes(self) -> list[int | None]:
         codes = []
-        for s in self.status:
+        for s in self.statuses:
             codes.append(s.returncode)
         return codes
 
     def get_outputs(self) -> list[str | None]:
         outputs = []
-        for s in self.status:
+        for s in self.statuses:
             outputs.append(s.stdout)
         return outputs
 
@@ -102,15 +107,18 @@ class ShellCommand(CommandBase):
         self.kwargs = gen_default_kwargs(kwargs)
         super().__init__(timeout)
 
-    def create_popens(self):
-        self.popens = [Popen(self.cmd, shell=True, **self.kwargs)]
-        self.status = [Status()]
+    def run(self) -> Status:
+        popen = Popen(self.cmd, shell=True, **self.kwargs)
+        status = Status(popen=popen)
+        wait_popen(popen, status, self.timeout)
+        self.statuses.append(status)
+        return status
 
     def get_code(self) -> int | None:
-        return self.status[0].returncode
+        return self.statuses[0].returncode
 
     def get_output(self) -> str | None:
-        return self.status[0].stdout
+        return self.statuses[0].stdout
 
 
 class SingleCommand(CommandBase):
@@ -133,15 +141,18 @@ class SingleCommand(CommandBase):
         self.kwargs = kwargs
         super().__init__(timeout)
 
-    def create_popens(self):
-        self.popens = [Popen(self.cmd, **self.kwargs)]
-        self.status = [Status()]
+    def run(self) -> Status:
+        popen = Popen(self.cmd, **self.kwargs)
+        status = Status(popen=popen)
+        wait_popen(popen, status, self.timeout)
+        self.statuses.append(status)
+        return status
 
     def get_code(self) -> int | None:
-        return self.status[0].returncode
+        return self.statuses[0].returncode
 
     def get_output(self) -> str | None:
-        return self.status[0].stdout
+        return self.statuses[0].stdout
 
 
 class MultiCommand(CommandBase):
@@ -161,32 +172,31 @@ class MultiCommand(CommandBase):
         self.kwargs = kwargs
         super().__init__(timeout)
 
-    def create_popens(self) -> Sequence[Popen]:
-        popens = []
+    def run(self) -> list[Status]:
         for cmd in self.cmds:
             if isinstance(cmd, str):
                 cmd = shlex.split(cmd)
-            popens.append(Popen(cmd, **self.kwargs))
-        return popens
+            popen = Popen(cmd, **self.kwargs)
+            status = Status(popen=popen)
+            self.statuses.append(status)
+        for status in self.statuses:
+            popen = status.popen
+            wait_popen(popen, status, self.timeout)
+        return self.statuses
 
 
-class SequenceCommand(CommandBase):
-    def __init__(
-        self,
-        cmds: Sequence[CMD],
-        working_path: StrOrBytesPath | None = None,
-        timeout: float | None = None,
-        **kwargs,
-    ):
-        pass
+class SequenceCommand(MultiCommand):
+    def run(self) -> list[Status]:
+        for cmd in self.cmds:
+            if isinstance(cmd, str):
+                cmd = shlex.split(cmd)
+            popen = Popen(cmd, **self.kwargs)
+            status = Status(popen=popen)
+            self.statuses.append(status)
+            popen = status.popen
+            wait_popen(popen, status, self.timeout)
+        return self.statuses
 
 
-class PipelineCommand(CommandBase):
-    def __init__(
-        self,
-        cmds: Sequence[CMD],
-        working_path: StrOrBytesPath | None = None,
-        timeout: float | None = None,
-        **kwargs,
-    ):
-        pass
+class ParallelCommand(MultiCommand):
+    pass
