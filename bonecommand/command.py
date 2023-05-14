@@ -26,6 +26,12 @@ def gen_default_kwargs(kwargs: dict[str, Any]):
     return kwargs
 
 
+class SubprocessError(Exception):
+    def __init__(self, return_code):
+        self.return_code = return_code
+        super().__init__(f"Subprocess returned non-zero exit status {return_code}")
+
+
 class Status(BaseModel):
     finished: bool = False
     returncode: Optional[int] = None
@@ -33,19 +39,78 @@ class Status(BaseModel):
 
 
 class CommandBase:
-    def __init__(self, popens: Sequence[Popen], timeout: float | None = None):
-        self.popens = popens
+    def __init__(self, timeout: float | None = None):
         self.timeout = timeout
-        self.popens_status: list[Status] = [Status() for _ in popens]
+        self.popens: list[Popen] = []
+        self.status: list[Status] = []
+
+    def create_popens(self):
+        raise NotImplementedError
 
     def run(self) -> list[Status]:
-        for p, s in zip(self.popens, self.popens_status):
+        self.create_popens()
+        for p, s in zip(self.popens, self.status):
             if not s.finished:
                 s.finished = True
                 with p:
                     s.returncode = p.wait(timeout=self.timeout)
-                    s.stdout = p.stdout.read().decode()
-        return self.popens_status
+                    if p.stdout is not None:
+                        s.stdout = p.stdout.read().decode()
+        return self.status
+
+    def finished(self) -> bool:
+        for s in self.status:
+            if not s.finished:
+                return False
+        return True
+
+    def get_code(self) -> int | None:
+        for code in self.get_codes():
+            if code != 0:
+                return code
+        return 0
+
+    def get_output(self) -> str | None:
+        raise NotImplementedError
+
+    def get_codes(self) -> list[int | None]:
+        codes = []
+        for s in self.status:
+            codes.append(s.returncode)
+        return codes
+
+    def get_outputs(self) -> list[str | None]:
+        outputs = []
+        for s in self.status:
+            outputs.append(s.stdout)
+        return outputs
+
+
+class ShellCommand(CommandBase):
+    def __init__(
+        self,
+        cmds: Sequence[str],
+        working_path: StrOrBytesPath | None = None,
+        timeout: float | None = None,
+        **kwargs,
+    ):
+        if working_path is not None:
+            if kwargs.get("cwd") is not None:
+                raise ValueError("cwd and working_path arguments may not both be used.")
+            kwargs["cwd"] = working_path
+        self.cmd = "\n".join(cmds)
+        self.kwargs = gen_default_kwargs(kwargs)
+        super().__init__(timeout)
+
+    def create_popens(self):
+        self.popens = [Popen(self.cmd, shell=True, **self.kwargs)]
+        self.status = [Status()]
+
+    def get_code(self) -> int | None:
+        return self.status[0].returncode
+
+    def get_output(self) -> str | None:
+        return self.status[0].stdout
 
 
 class SingleCommand(CommandBase):
@@ -66,13 +131,17 @@ class SingleCommand(CommandBase):
             kwargs["cwd"] = working_path
         kwargs = gen_default_kwargs(kwargs)
         self.kwargs = kwargs
-        super().__init__([Popen(self.cmd, **self.kwargs)], timeout)
+        super().__init__(timeout)
 
-    def get_code(self) -> int:
-        return self.run()[0].returncode
+    def create_popens(self):
+        self.popens = [Popen(self.cmd, **self.kwargs)]
+        self.status = [Status()]
 
-    def get_output(self) -> str:
-        return self.run()[0].stdout
+    def get_code(self) -> int | None:
+        return self.status[0].returncode
+
+    def get_output(self) -> str | None:
+        return self.status[0].stdout
 
 
 class MultiCommand(CommandBase):
@@ -83,48 +152,41 @@ class MultiCommand(CommandBase):
         timeout: float | None = None,
         **kwargs,
     ):
+        self.cmds = cmds
         if working_path is not None:
             if kwargs.get("cwd") is not None:
                 raise ValueError("cwd and working_path arguments may not both be used.")
             kwargs["cwd"] = working_path
         kwargs = gen_default_kwargs(kwargs)
+        self.kwargs = kwargs
+        super().__init__(timeout)
+
+    def create_popens(self) -> Sequence[Popen]:
         popens = []
-        for cmd in cmds:
+        for cmd in self.cmds:
             if isinstance(cmd, str):
                 cmd = shlex.split(cmd)
-            popens.append(Popen(cmd, **kwargs))
-        super().__init__(popens, timeout)
-
-    def get_codes(self) -> list[int]:
-        codes = []
-        for s in self.popens_status:
-            codes.append(s.returncode)
-        return codes
-
-    def get_outputs(self) -> list[str]:
-        outputs = []
-        for s in self.popens_status:
-            outputs.append(s.stdout)
-        return outputs
+            popens.append(Popen(cmd, **self.kwargs))
+        return popens
 
 
-class ShellCommand(CommandBase):
+class SequenceCommand(CommandBase):
     def __init__(
         self,
-        cmds: Sequence[str],
+        cmds: Sequence[CMD],
         working_path: StrOrBytesPath | None = None,
         timeout: float | None = None,
         **kwargs,
     ):
-        if working_path is not None:
-            if kwargs.get("cwd") is not None:
-                raise ValueError("cwd and working_path arguments may not both be used.")
-            kwargs["cwd"] = working_path
-        kwargs = gen_default_kwargs(kwargs)
-        super().__init__([Popen("\n".join(cmds), shell=True, **kwargs)], timeout)
+        pass
 
-    def get_code(self) -> int:
-        return self.run()[0].returncode
 
-    def get_output(self) -> str:
-        return self.run()[0].stdout
+class PipelineCommand(CommandBase):
+    def __init__(
+        self,
+        cmds: Sequence[CMD],
+        working_path: StrOrBytesPath | None = None,
+        timeout: float | None = None,
+        **kwargs,
+    ):
+        pass
