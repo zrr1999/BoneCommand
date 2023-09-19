@@ -15,5 +15,5 @@ source = "file"
 path = "bonecommand/__init__.py"
 
 [build-system]
-requires = ["pdm-pep517>=1.0.0"]
-build-backend = "pdm.pep517.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

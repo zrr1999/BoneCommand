@@ -1,5 +1,15 @@
-#!/usr/bin/env python
-# _*_ coding: utf-8 _*_
-# @Time : 2023/1/6 17:51
-# @Author : Rongrui Zhan
-# @desc : 本代码未经授权禁止商用
+import bonecommand as bc
+import asyncio
+
+
+a = bc.SingleCommand("bash -c 'sleep 0.1 && echo $RANDOM'")
+
+cmds = [a.run(), a.run(), a.run(), a.run()]
+
+
+async def main():
+    statuses = await asyncio.gather(*cmds)
+    return list(map(lambda s: s.stdout, statuses))
+
+
+print(asyncio.run(main()))

@@ -4,3 +4,6 @@ dist/
 
 .pdm.toml
 .DS_Store
+
+tests/
+examples/
